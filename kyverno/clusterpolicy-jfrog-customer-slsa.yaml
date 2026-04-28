@@ -1,0 +1,56 @@
+# Customer sample (JFrog / Artifactory): Sigstore bundle + SLSA provenance v1 stored alongside image metadata.
+# Derived from slsa-provenance-1776959389517-58d515d3.sigstore.json
+#
+# Decoded DSSE subject (OCI image name in attestation):
+#   artifact.it.att.com/apm0010018-dkr-tsurvey-stage/tsurveyms/msanalysissrv
+# Predicate shows caller workflow: ATT-DP1/apm0010018-tSurvey-msanalysissrv @ .github/workflows/ci.yaml
+#
+# IMPORTANT — Kyverno keyless "subject" matches the X.509 URI SAN on the signing certificate.
+# For reusable workflows, that is often the REUSABLE workflow, not the app repo workflow:
+#   https://github.com/ATT-IDP/revup-workflows/.github/workflows/reusable_workflow_java_ci.yaml@refs/tags/v3
+# If ATT-IDP changes the reusable workflow tag, widen subjectRegExp (e.g. v[0-9]+).
+#
+# Prerequisites: Kyverno 1.13+ with SigstoreBundle support; cluster can reach Artifactory + Rekor.
+
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: jfrog-msanalysissrv-slsa-provenance
+  annotations:
+    policies.kyverno.io/title: SLSA provenance (GitHub OIDC) for JFrog msanalysissrv image
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookConfiguration:
+    failurePolicy: Fail
+    timeoutSeconds: 30
+  rules:
+    - name: verify-jfrog-image-sigstore-bundle
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      verifyImages:
+        - imageReferences:
+            - "artifact.it.att.com/apm0010018-dkr-tsurvey-stage/tsurveyms/msanalysissrv*"
+          failureAction: Enforce
+          type: SigstoreBundle
+          attestations:
+            - type: https://slsa.dev/provenance/v1
+              attestors:
+                - entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        # Matches Fulcio URI SAN (reusable workflow that actually signed).
+                        subjectRegExp: "^https://github\\.com/ATT-IDP/revup-workflows/\\.github/workflows/reusable_workflow_java_ci\\.yaml@refs/tags/v[0-9]+$"
+                        rekor:
+                          url: https://rekor.sigstore.dev
+              # Optional: bind to the application repo that invoked the reusable workflow (uncomment if needed).
+              # conditions:
+              #   - all:
+              #       - key: "{{ buildDefinition.externalParameters.workflow.repository }}"
+              #         operator: Equals
+              #         value: "https://github.com/ATT-DP1/apm0010018-tSurvey-msanalysissrv"

@@ -1,0 +1,50 @@
+{
+  "_comment": "Decoded from dsseEnvelope.payload (base64) in slsa-provenance-1776959389517-58d515d3.sigstore.json",
+  "_type": "https://in-toto.io/Statement/v1",
+  "subject": [
+    {
+      "name": "artifact.it.att.com/apm0010018-dkr-tsurvey-stage/tsurveyms/msanalysissrv",
+      "digest": {
+        "sha256": "7ca91a88efc15bba6ccb612e3f6206cc4e3bef179a5fb5b838ab09a56dbdab57"
+      }
+    }
+  ],
+  "predicateType": "https://slsa.dev/provenance/v1",
+  "predicate": {
+    "buildDefinition": {
+      "buildType": "https://actions.github.io/buildtypes/workflow/v1",
+      "externalParameters": {
+        "workflow": {
+          "ref": "refs/heads/release/devazure",
+          "repository": "https://github.com/ATT-DP1/apm0010018-tSurvey-msanalysissrv",
+          "path": ".github/workflows/ci.yaml"
+        }
+      },
+      "internalParameters": {
+        "github": {
+          "event_name": "workflow_dispatch",
+          "repository_id": "704638904",
+          "repository_owner_id": "142843727",
+          "runner_environment": "self-hosted"
+        }
+      },
+      "resolvedDependencies": [
+        {
+          "uri": "git+https://github.com/ATT-DP1/apm0010018-tSurvey-msanalysissrv@refs/heads/release/devazure",
+          "digest": {
+            "gitCommit": "cdbbca133bafc408782cdde9cfaa506d1f42b450"
+          }
+        }
+      ]
+    },
+    "runDetails": {
+      "builder": {
+        "id": "https://github.com/ATT-IDP/revup-workflows/.github/workflows/reusable_workflow_java_ci.yaml@refs/tags/v3"
+      },
+      "metadata": {
+        "invocationId": "https://github.com/ATT-DP1/apm0010018-tSurvey-msanalysissrv/actions/runs/24844226332/attempts/1"
+      }
+    }
+  },
+  "_certificate_uri_san_for_kyverno_keyless": "https://github.com/ATT-IDP/revup-workflows/.github/workflows/reusable_workflow_java_ci.yaml@refs/tags/v3"
+}
