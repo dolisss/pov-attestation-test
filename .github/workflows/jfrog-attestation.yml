@@ -59,8 +59,14 @@ jobs:
           DEST_IMAGE="${REG_PREFIX}:${{ env.IMAGE_TAG }}"
           docker pull "${{ env.UPSTREAM_IMAGE }}"
           docker tag "${{ env.UPSTREAM_IMAGE }}" "${DEST_IMAGE}"
-          docker push "${DEST_IMAGE}"
-          DIGEST="$(docker buildx imagetools inspect "${DEST_IMAGE}" --format '{{.Digest}}')"
+          PUSH_OUTPUT="$(docker push "${DEST_IMAGE}" 2>&1)"
+          printf '%s\n' "${PUSH_OUTPUT}"
+          # Manifest digest from push output (imagetools --format '{{.Digest}}' breaks on newer buildx tplInput)
+          DIGEST="$(echo "${PUSH_OUTPUT}" | grep 'digest: sha256:' | tail -1 | sed -E 's/.*digest: (sha256:[a-f0-9]+).*/\1/')"
+          if [ -z "${DIGEST}" ]; then
+            echo "::error::Could not parse digest from docker push output"
+            exit 1
+          fi
           echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
 
       - name: Generate build provenance attestation
