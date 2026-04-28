@@ -1,5 +1,5 @@
 {
-  "_comment": "Decoded from dsseEnvelope.payload (base64) in slsa-provenance-1776959389517-58d515d3.sigstore.json",
+  "_comment": "Decoded from dsseEnvelope.payload (base64) in the .sigstore.json bundle. This JSON is for humans/audits only — Kyverno reads the full Sigstore bundle from the OCI registry (not this file). The source bundle has tlogEntries: [] so the Kyverno policy should use rekor.ignoreTlog: true.",
   "_type": "https://in-toto.io/Statement/v1",
   "subject": [
     {
