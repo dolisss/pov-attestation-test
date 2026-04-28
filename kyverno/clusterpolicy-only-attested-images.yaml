@@ -1,0 +1,65 @@
+# Enforce: every workload container image must have a valid GitHub-generated SLSA provenance
+# attestation (Sigstore bundle) on the registry, signed with the expected GitHub OIDC identity.
+#
+# This is how you "allow only attested images" for application namespaces. Images that are not
+# matched by this rule are still governed by your tighter per-image policies (nginx, JFrog) if
+# you keep those: Kyverno applies all matching rules, so a stricter per-repo policy can still
+# add requirements for specific images.
+#
+# Tune the subjectRegExp to restrict *which* GitHub orgs / workflows you trust, e.g.:
+#   only nirmata:  ^https://github\\.com/nirmata/
+#   your PoV:      (keep separate require-github-container-attestation for exact workflow)
+#
+# System / infra images in kube-system, pause sandboxes, etc. are usually NOT on GitHub — use
+# skipImageReferences + match.exclude namespaces below. Extend the lists for your cluster
+# (CNI, cert-manager, ingress, GPU drivers, public cloud add-ons, etc.).
+
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: only-github-attested-container-images
+  annotations:
+    policies.kyverno.io/title: Only allow images with GitHub SLSA attestation
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookConfiguration:
+    failurePolicy: Fail
+    timeoutSeconds: 30
+  rules:
+    - name: require-sigstore-slsa-everywhere
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      # Do not require attestation for pods in these namespaces (cluster add-ons, Kyverno itself).
+      exclude:
+        any:
+          - resources:
+              namespaces:
+                - kube-system
+                - kube-public
+                - kube-node-lease
+                - kyverno
+      verifyImages:
+        - imageReferences:
+            - "*"
+          failureAction: Enforce
+          type: SigstoreBundle
+          skipImageReferences:
+            - "registry.k8s.io/pause*"
+            - "registry.k8s.io/pause:*"
+            - "k8s.gcr.io/pause*"
+          attestations:
+            - type: https://slsa.dev/provenance/v1
+              attestors:
+                - entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        # Any repository workflow identity (tighten to your org if needed)
+                        subjectRegExp: ^https://github\.com/[^/]+/[^/]+/\.github/workflows/.+@refs/
+                        rekor:
+                          url: https://rekor.sigstore.dev
