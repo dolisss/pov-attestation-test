@@ -1,18 +1,18 @@
-# Verifies GitHub Actions artifact attestations (Sigstore bundle, SLSA provenance v1) for the nginx image.
-# Built for actions/attest-build-provenance with push-to-registry: true.
+# Verifies GitHub Actions Sigstore bundle + SLSA provenance v1 for images pushed by .github/workflows/jfrog-attestation.yml
+# (actions/attest-build-provenance with push-to-registry: true).
 #
-# Prerequisites: Kyverno 1.13+ with SigstoreBundle image verification support.
-# Tune subjectRegExp if owner/repo or workflow filename changes (default: dolisss/pov-attestation-test / docker-attestation.yml).
+# imageReferences match jfrog-attestation.yml push target: dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx
+# Tune subjectRegExp only if you rename the workflow file or move the repo.
 #
-# Images without a matching attestation fail verification and are blocked—no separate rule for “unsigned” images.
-# No predicate conditions: signer identity + Sigstore bundle + SLSA provenance type are sufficient.
+# Prerequisites: Kyverno 1.13+ with SigstoreBundle image verification.
+# If bundles show tlogEntries: [], consider rekor.ignoreTlog: true on the attestor (see Kyverno docs).
 
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
-  name: require-github-container-attestation
+  name: require-github-container-attestation-jfrog
   annotations:
-    policies.kyverno.io/title: Require GitHub SLSA provenance on nirmatainstaller/nginx
+    policies.kyverno.io/title: Require GitHub SLSA provenance on JFrog nirmatainstaller/nginx
     policies.kyverno.io/category: Software Supply Chain Security
     policies.kyverno.io/severity: high
 spec:
@@ -22,7 +22,7 @@ spec:
     failurePolicy: Fail
     timeoutSeconds: 30
   rules:
-    - name: verify-nirmata-nginx-from-pov-workflow
+    - name: verify-jfrog-nginx-from-pov-workflow
       match:
         any:
           - resources:
@@ -30,8 +30,7 @@ spec:
                 - Pod
       verifyImages:
         - imageReferences:
-            - "docker.io/nirmatainstaller/nginx*"
-            - "index.docker.io/nirmatainstaller/nginx*"
+            - "dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx*"
           failureAction: Enforce
           type: SigstoreBundle
           attestations:
@@ -40,6 +39,6 @@ spec:
                 - entries:
                     - keyless:
                         issuer: https://token.actions.githubusercontent.com
-                        subjectRegExp: "^https://github\\.com/dolisss/pov-attestation-test/\\.github/workflows/docker-attestation\\.yml@"
+                        subjectRegExp: "^https://github\\.com/dolisss/pov-attestation-test/\\.github/workflows/jfrog-attestation\\.yml@"
                         rekor:
                           url: https://rekor.sigstore.dev
