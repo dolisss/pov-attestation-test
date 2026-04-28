@@ -22,9 +22,6 @@ spec:
       verifyImages:
         - imageReferences:
             - "*"
-          imageRegistryCredentials:
-            secrets:
-              - regcred
           failureAction: Enforce
           type: SigstoreBundle
           attestations:
