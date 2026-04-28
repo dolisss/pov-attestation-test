@@ -1,14 +1,13 @@
 # All container images must verify against Sigstore + SLSA provenance for this customer’s build:
 # GitHub OIDC + Fulcio URI matching ATT-IDP reusable_workflow_java_ci (see subjectRegExp).
-# imageReferences is "*" for cluster-wide scope; system namespaces and pause are excluded/skipped
-# so typical platform images are not forced through this rule.
+# Applies only to the default namespace. imageReferences is *; pause sandboxes are skipped.
 
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
   name: jfrog-msanalysissrv-slsa-provenance
   annotations:
-    policies.kyverno.io/title: SLSA (ATT-IDP reusable Java workflow) for all images
+    policies.kyverno.io/title: SLSA (ATT-IDP reusable Java workflow) — default namespace only
     policies.kyverno.io/category: Software Supply Chain Security
     policies.kyverno.io/severity: high
 spec:
@@ -24,14 +23,8 @@ spec:
           - resources:
               kinds:
                 - Pod
-      exclude:
-        any:
-          - resources:
               namespaces:
-                - kube-system
-                - kube-public
-                - kube-node-lease
-                - kyverno
+                - default
       verifyImages:
         - imageReferences:
             - "*"
