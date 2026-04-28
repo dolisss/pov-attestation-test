@@ -34,9 +34,3 @@ spec:
                         subjectRegExp: "^https://github\\.com/ATT-IDP/revup-workflows/\\.github/workflows/reusable_workflow_java_ci\\.yaml@refs/tags/v[0-9]+$"
                         rekor:
                           url: https://rekor.sigstore.dev
-              # Optional: bind to the application repo that invoked the reusable workflow (uncomment if needed).
-              # conditions:
-              #   - all:
-              #       - key: "{{ buildDefinition.externalParameters.workflow.repository }}"
-              #         operator: Equals
-              #         value: "https://github.com/ATT-DP1/apm0010018-tSurvey-msanalysissrv"
