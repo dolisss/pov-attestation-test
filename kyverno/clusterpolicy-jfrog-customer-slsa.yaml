@@ -1,25 +1,3 @@
-# JFrog + GitHub SLSA (Sigstore bundle) — READ THIS IF YOU SEE "no matching signatures"
-#
-# A) Private registry: Kyverno must authenticate to Artifactory to read the IMAGE + any OCI
-#    attestation referrers. Without auth it often looks like "no matching signatures" (not 401 in message).
-#    1) Create a dockerconfig secret in the Kyverno namespace, e.g.:
-#         kubectl create secret generic jfrog-registry-cred -n kyverno \
-#           --from-file=.dockerconfigjson=$HOME/.docker/config.json
-#       (after `docker login` to the same host your Pods use, e.g. artifact.it.att.com)
-#    2) Add that secret name under imageRegistryCredentials below (uncomment or add).
-#    3) If Artifactory uses a private CA, add that CA to Kyverno (Helm global.caCertificates, etc.).
-#
-# B) Attestation must exist ON THE REGISTRY for the same digest you run. The JSON in this repo
-#    is for humans only. Prove it from a machine with registry access:
-#      cosign download attestation <image-with-digest>   # or referrers API
-#    If this returns nothing, Kyverno will never find a bundle.
-#
-# C) ignoreTlog / ignoreSCT: required when the bundle has no Rekor tlog (tlogEntries: []).
-#
-# D) If still stuck: temporarily widen subjectRegExp to test identity matching:
-#      subjectRegExp: ^https://github\.com/ATT-IDP/
-#    then narrow again once confirmed.
-
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -43,13 +21,7 @@ spec:
                 - Pod
       verifyImages:
         - imageReferences:
-            - "artifact.it.att.com/*"
-            - "artifact.it.att.com:443/*"
-          # List the registry pull secret in kyverno namespace (see block A above). Remove this block
-          # only if the registry is fully anonymous for manifest + referrers reads.
-          imageRegistryCredentials:
-            secrets:
-              - jfrog-registry-cred
+            - "artifact.it.att.com/apm0010018-dkr-tsurvey-stage/tsurveyms/msanalysissrv*"
           failureAction: Enforce
           type: SigstoreBundle
           attestations:
@@ -58,9 +30,7 @@ spec:
                 - entries:
                     - keyless:
                         issuer: https://token.actions.githubusercontent.com
+                        # Matches Fulcio URI SAN (reusable workflow that actually signed).
                         subjectRegExp: "^https://github\\.com/ATT-IDP/revup-workflows/\\.github/workflows/reusable_workflow_java_ci\\.yaml@refs/tags/v[0-9]+$"
                         rekor:
                           url: https://rekor.sigstore.dev
-                          ignoreTlog: true
-                        ctlog:
-                          ignoreSCT: true
