@@ -1,13 +1,3 @@
-# Same shape as clusterpolicy-jfrog-customer-slsa.yaml: one verifyImages rule.
-# When a Pod uses this JFrog image, Kyverno requires a Sigstore bundle + SLSA provenance v1
-# signed by the expected GitHub Actions workflow identity.
-#
-# This does NOT reject Pods that use other images (docker.io, etc.). Those simply don’t match
-# imageReferences and are unaffected. Add a separate allowlist/deny policy only if you must
-# block every image except this path.
-#
-# Private JFrog: secret jfrog-docker-pull in kyverno namespace (see docker-registry create examples).
-
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -31,10 +21,10 @@ spec:
                 - Pod
       verifyImages:
         - imageReferences:
-            - "dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx*"
+            - "*"
           imageRegistryCredentials:
             secrets:
-              - jfrog-docker-pull
+              - regcred
           failureAction: Enforce
           type: SigstoreBundle
           attestations:
