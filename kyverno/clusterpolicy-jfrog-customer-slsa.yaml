@@ -1,17 +1,3 @@
-# Customer sample (JFrog / Artifactory): Sigstore bundle + SLSA provenance v1 stored alongside image metadata.
-# Derived from slsa-provenance-1776959389517-58d515d3.sigstore.json
-#
-# Decoded DSSE subject (OCI image name in attestation):
-#   artifact.it.att.com/apm0010018-dkr-tsurvey-stage/tsurveyms/msanalysissrv
-# Predicate shows caller workflow: ATT-DP1/apm0010018-tSurvey-msanalysissrv @ .github/workflows/ci.yaml
-#
-# IMPORTANT — Kyverno keyless "subject" matches the X.509 URI SAN on the signing certificate.
-# For reusable workflows, that is often the REUSABLE workflow, not the app repo workflow:
-#   https://github.com/ATT-IDP/revup-workflows/.github/workflows/reusable_workflow_java_ci.yaml@refs/tags/v3
-# If ATT-IDP changes the reusable workflow tag, widen subjectRegExp (e.g. v[0-9]+).
-#
-# Prerequisites: Kyverno 1.13+ with SigstoreBundle support; cluster can reach Artifactory + Rekor.
-
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
