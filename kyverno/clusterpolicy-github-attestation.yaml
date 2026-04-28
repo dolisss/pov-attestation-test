@@ -5,6 +5,7 @@
 # Tune subjectRegExp if owner/repo or workflow filename changes (default: dolisss/pov-attestation-test / docker-attestation.yml).
 #
 # Images without a matching attestation fail verification and are blocked—no separate rule for “unsigned” images.
+# No predicate conditions: signer identity + Sigstore bundle + SLSA provenance type are sufficient.
 
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
@@ -42,8 +43,3 @@ spec:
                         subjectRegExp: "^https://github\\.com/dolisss/pov-attestation-test/\\.github/workflows/docker-attestation\\.yml@"
                         rekor:
                           url: https://rekor.sigstore.dev
-              conditions:
-                - all:
-                    - key: "{{ buildDefinition.buildType }}"
-                      operator: Equals
-                      value: https://actions.github.io/buildtypes/workflow/v1
