@@ -1,23 +1,19 @@
-# Allow ONLY images under this JFrog path AND require a valid GitHub Sigstore bundle + SLSA provenance v1
-# (same shape as policy.yaml / clusterpolicy-github-attestation.yaml).
+# Same shape as clusterpolicy-jfrog-customer-slsa.yaml: one verifyImages rule.
+# When a Pod uses this JFrog image, Kyverno requires a Sigstore bundle + SLSA provenance v1
+# signed by the expected GitHub Actions workflow identity.
 #
-# Rule A — deny any container image outside dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx (tag or digest).
-# Rule B — verify Sigstore bundle + slsa.dev/provenance/v1 signed by jfrog-attestation.yml workflow identity.
+# This does NOT reject Pods that use other images (docker.io, etc.). Those simply don’t match
+# imageReferences and are unaffected. Add a separate allowlist/deny policy only if you must
+# block every image except this path.
 #
-# Scope: namespace jfrog-attest-demo (remove namespaces under match for cluster-wide).
-#
-# Private JFrog: create a docker-registry secret in namespace kyverno and reference it below, e.g.:
-#   kubectl create secret docker-registry jfrog-docker-pull -n kyverno \
-#     --docker-server=dolisss.jfrog.io --docker-username=USER --docker-password=TOKEN
-#
-# Prerequisites: Kyverno 1.13+ with SigstoreBundle. Empty Rekor entries: ignoreTlog below.
+# Private JFrog: secret jfrog-docker-pull in kyverno namespace (see docker-registry create examples).
 
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
-  name: jfrog-only-attested-images
+  name: jfrog-nginx-slsa-provenance
   annotations:
-    policies.kyverno.io/title: Only JFrog attested nginx — deny all other images
+    policies.kyverno.io/title: SLSA provenance (GitHub OIDC) for JFrog nirmatainstaller/nginx
     policies.kyverno.io/category: Software Supply Chain Security
     policies.kyverno.io/severity: high
 spec:
@@ -27,84 +23,12 @@ spec:
     failurePolicy: Fail
     timeoutSeconds: 30
   rules:
-    - name: deny-images-outside-jfrog-nginx-path-containers
+    - name: verify-jfrog-nginx-sigstore-bundle
       match:
         any:
           - resources:
               kinds:
                 - Pod
-              namespaces:
-                - jfrog-attest-demo
-      validate:
-        message: >-
-          Only dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx images are allowed (tag or @sha256 digest).
-        foreach:
-          - list: request.object.spec.containers
-            deny:
-              conditions:
-                any:
-                  - key: "{{ regex_match('^dolisss\\.jfrog\\.io/nginx-docker/nirmatainstaller/nginx(@sha256:[a-f0-9]{64}|:[a-zA-Z0-9._-]+)$', element.image) }}"
-                    operator: Equals
-                    value: false
-
-    - name: deny-images-outside-jfrog-nginx-path-initcontainers
-      match:
-        any:
-          - resources:
-              kinds:
-                - Pod
-              namespaces:
-                - jfrog-attest-demo
-      preconditions:
-        all:
-          - key: "{{ length(request.object.spec.initContainers || `[]`) }}"
-            operator: GreaterThan
-            value: "0"
-      validate:
-        message: >-
-          Only dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx images are allowed (tag or @sha256 digest).
-        foreach:
-          - list: request.object.spec.initContainers
-            deny:
-              conditions:
-                any:
-                  - key: "{{ regex_match('^dolisss\\.jfrog\\.io/nginx-docker/nirmatainstaller/nginx(@sha256:[a-f0-9]{64}|:[a-zA-Z0-9._-]+)$', element.image) }}"
-                    operator: Equals
-                    value: false
-
-    - name: deny-images-outside-jfrog-nginx-path-ephemeral
-      match:
-        any:
-          - resources:
-              kinds:
-                - Pod
-              namespaces:
-                - jfrog-attest-demo
-      preconditions:
-        all:
-          - key: "{{ length(request.object.spec.ephemeralContainers || `[]`) }}"
-            operator: GreaterThan
-            value: "0"
-      validate:
-        message: >-
-          Only dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx images are allowed (tag or @sha256 digest).
-        foreach:
-          - list: request.object.spec.ephemeralContainers
-            deny:
-              conditions:
-                any:
-                  - key: "{{ regex_match('^dolisss\\.jfrog\\.io/nginx-docker/nirmatainstaller/nginx(@sha256:[a-f0-9]{64}|:[a-zA-Z0-9._-]+)$', element.image) }}"
-                    operator: Equals
-                    value: false
-
-    - name: verify-jfrog-nginx-sigstore-attestation
-      match:
-        any:
-          - resources:
-              kinds:
-                - Pod
-              namespaces:
-                - jfrog-attest-demo
       verifyImages:
         - imageReferences:
             - "dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx*"
