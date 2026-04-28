@@ -1,0 +1,49 @@
+# Verifies GitHub Actions artifact attestations (Sigstore bundle, SLSA provenance v1) for the nginx image.
+# Built for actions/attest-build-provenance with push-to-registry: true.
+#
+# Prerequisites: Kyverno 1.13+ with SigstoreBundle image verification support.
+# Tune subjectRegExp if owner/repo or workflow filename changes (default: dolisss/pov-attestation-test / docker-attestation.yml).
+#
+# Images without a matching attestation fail verification and are blocked—no separate rule for “unsigned” images.
+
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-github-container-attestation
+  annotations:
+    policies.kyverno.io/title: Require GitHub SLSA provenance on nirmatainstaller/nginx
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookConfiguration:
+    failurePolicy: Fail
+    timeoutSeconds: 30
+  rules:
+    - name: verify-nirmata-nginx-from-pov-workflow
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      verifyImages:
+        - imageReferences:
+            - "docker.io/nirmatainstaller/nginx*"
+            - "index.docker.io/nirmatainstaller/nginx*"
+          failureAction: Enforce
+          type: SigstoreBundle
+          attestations:
+            - type: https://slsa.dev/provenance/v1
+              attestors:
+                - entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subjectRegExp: "^https://github\\.com/dolisss/pov-attestation-test/\\.github/workflows/docker-attestation\\.yml@"
+                        rekor:
+                          url: https://rekor.sigstore.dev
+              conditions:
+                - all:
+                    - key: "{{ buildDefinition.buildType }}"
+                      operator: Equals
+                      value: https://actions.github.io/buildtypes/workflow/v1
