@@ -1,0 +1,10 @@
+# Expect: DENY — not under allowed JFrog path (rule: deny-images-outside-jfrog-nginx-path-*).
+apiVersion: v1
+kind: Pod
+metadata:
+  name: negative-dockerhub
+  namespace: jfrog-attest-demo
+spec:
+  containers:
+    - name: nginx
+      image: docker.io/library/nginx:alpine

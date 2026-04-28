@@ -1,0 +1,11 @@
+# Expect: ALLOW — digest matches ORAS-discovered attestation for jfrog-attestation workflow.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: positive-attested-nginx
+  namespace: jfrog-attest-demo
+spec:
+  containers:
+    - name: nginx
+      image: dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx@sha256:0fd68ec4b64b8dbb2bef1f1a5de9d47b658afd3635dc9c45bf0cbeac46e72101
+      imagePullPolicy: IfNotPresent

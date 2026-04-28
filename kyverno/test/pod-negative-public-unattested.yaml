@@ -1,0 +1,11 @@
+# Expect: DENY — allowed path pattern not met (docker.io/...) OR fails path rule first.
+# Alternative negative: use any public image not from dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx
+apiVersion: v1
+kind: Pod
+metadata:
+  name: negative-public-busybox
+  namespace: jfrog-attest-demo
+spec:
+  containers:
+    - name: busybox
+      image: registry.k8s.io/pause:3.9
