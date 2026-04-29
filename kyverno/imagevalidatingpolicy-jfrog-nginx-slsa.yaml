@@ -1,11 +1,10 @@
-# ImageValidatingPolicy (Kyverno 1.17+) — replaces ClusterPolicy verifyImages + SigstoreBundle.
+# ImageValidatingPolicy (Kyverno 1.17+)
+# GitHub actions/attest-build-provenance attaches v0.3 Sigstore bundles as OCI *referrers*
+# (media type application/vnd.dev.sigstore.bundle.v0.3+json), not legacy cosign intoto blobs.
+# Use `referrer` (not only `intoto`) so verifyAttestationSignatures can find the bundle.
+#
 # Docs: https://kyverno.io/docs/policy-types/image-validating-policy/
-#
-# After applying, delete the legacy ClusterPolicy to avoid duplicate enforcement:
-#   kubectl delete clusterpolicy jfrog-nginx-slsa-provenance --ignore-not-found
-#
-# Registry auth for private JFrog: use spec.credentials.secrets (secrets in kyverno namespace)
-# or configure credentials on the Kyverno deployment.
+# Private JFrog: regcred in kyverno namespace (see credentials below).
 
 apiVersion: policies.kyverno.io/v1
 kind: ImageValidatingPolicy
@@ -33,8 +32,6 @@ spec:
         scope: '*'
   matchImageReferences:
     - glob: 'dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx*'
-  # Docker config secrets in namespace kyverno — required for private JFrog (token API + layers + attestations).
-  # kubectl create secret docker-registry regcred -n kyverno --docker-server=dolisss.jfrog.io ...
   credentials:
     secrets:
       - regcred
@@ -50,14 +47,16 @@ spec:
           insecureIgnoreTlog: true
           insecureIgnoreSCT: true
   attestations:
-    - name: slsaProvenance
-      intoto:
-        type: https://slsa.dev/provenance/v1
+    # OCI referrer artifact type for GitHub Artifact Attestations / actions/attest-build-provenance
+    - name: sigstoreBundle
+      referrer:
+        type: application/vnd.dev.sigstore.bundle.v0.3+json
   validations:
     - expression: >-
         images.containers.map(image,
-          verifyAttestationSignatures(image, attestations.slsaProvenance, [attestors.githubWorkflow])
+          verifyAttestationSignatures(image, attestations.sigstoreBundle, [attestors.githubWorkflow])
         ).all(e, e > 0)
       message: >-
-        Image must have a valid GitHub SLSA provenance attestation (Sigstore bundle) signed by
-        jfrog-attestation.yml (@refs/heads/main). Use digest or tag that has attestations in JFrog.
+        Image must have a valid GitHub Sigstore bundle (SLSA provenance) for jfrog-attestation.yml
+        on refs/heads/main. Pin digest or use tag that has referrers in JFrog; confirm with
+        `oras discover` / `gh attestation verify --bundle-from-oci`.
