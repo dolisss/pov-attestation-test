@@ -1,0 +1,61 @@
+# ImageValidatingPolicy (Kyverno 1.17+) — optional parallel to ClusterPolicy SigstoreBundle.
+# Do not enforce both this IVP and clusterpolicy-jfrog-nginx-sigstore-bundle on the same images
+# (double webhook). Use one: IVP (CEL) or ClusterPolicy (verifyImages SigstoreBundle).
+#
+# GitHub attest-build-provenance uses OCI referrers:
+#   application/vnd.dev.sigstore.bundle.v0.3+json
+#
+# Docs: https://kyverno.io/docs/policy-types/image-validating-policy/
+
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: jfrog-nginx-slsa-provenance
+  annotations:
+    policies.kyverno.io/title: SLSA / Sigstore bundle (IVP) for JFrog nirmatainstaller/nginx
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  validationActions:
+    - Deny
+  failurePolicy: Fail
+  webhookConfiguration:
+    timeoutSeconds: 30
+  evaluation:
+    background:
+      enabled: false
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ['']
+        apiVersions: ['v1']
+        operations: ['CREATE', 'UPDATE']
+        resources: ['pods']
+        scope: '*'
+  matchImageReferences:
+    - glob: 'dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx*'
+  credentials:
+    secrets:
+      - regcred
+  attestors:
+    - name: githubWorkflow
+      cosign:
+        keyless:
+          identities:
+            - issuer: https://token.actions.githubusercontent.com
+              subject: https://github.com/dolisss/pov-attestation-test/.github/workflows/jfrog-attestation.yml@refs/heads/main
+        ctlog:
+          url: https://rekor.sigstore.dev
+          insecureIgnoreTlog: true
+          insecureIgnoreSCT: true
+  attestations:
+    - name: sigstoreBundle
+      referrer:
+        type: application/vnd.dev.sigstore.bundle.v0.3+json
+  validations:
+    - expression: >-
+        images.containers.map(image,
+          verifyAttestationSignatures(image, attestations.sigstoreBundle, [attestors.githubWorkflow])
+        ).all(e, e > 0)
+      message: >-
+        Image must have a valid GitHub Sigstore bundle for jfrog-attestation.yml (@refs/heads/main).
+        If this fails while ClusterPolicy passes, prefer clusterpolicy-jfrog-nginx-sigstore-bundle.yaml only.
