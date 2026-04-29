@@ -1,3 +1,11 @@
+# Kyverno SigstoreBundle + GitHub attestations: use exact `subject` (matches Fulcio URI SAN)
+# and ctlog.ignoreSCT — see https://main.kyverno.io/docs/policy-types/cluster-policy/verify-images/sigstore/
+#
+# If admission still fails, compare `subject` to your cert:
+#   gh attestation verify oci://dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx@sha256:<digest> \
+#     --repo dolisss/pov-attestation-test --bundle-from-oci --format json | jq '.[0].verificationResult.signature.certificate'
+# Adjust subject for your branch/tag (e.g. @refs/tags/v1) or add another keyless entry under entries.
+
 apiVersion: kyverno.io/v1
 kind: ClusterPolicy
 metadata:
@@ -30,8 +38,9 @@ spec:
                 - entries:
                     - keyless:
                         issuer: https://token.actions.githubusercontent.com
-                        # SAN includes ref after @ e.g. @refs/heads/main — pattern must allow suffix past .yml@
-                        subjectRegExp: "^https://github\\.com/dolisss/pov-attestation-test/\\.github/workflows/jfrog-attestation\\.yml@.+"
+                        subject: https://github.com/dolisss/pov-attestation-test/.github/workflows/jfrog-attestation.yml@refs/heads/main
+                        ctlog:
+                          ignoreSCT: true
                         rekor:
                           url: https://rekor.sigstore.dev
                           ignoreTlog: true
