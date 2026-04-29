@@ -1,6 +1,10 @@
-# ImageValidatingPolicy (Kyverno 1.17+) — optional parallel to ClusterPolicy SigstoreBundle.
-# Do not enforce both this IVP and clusterpolicy-jfrog-nginx-sigstore-bundle on the same images
-# (double webhook). Use one: IVP (CEL) or ClusterPolicy (verifyImages SigstoreBundle).
+# ImageValidatingPolicy (Kyverno 1.17+). Admission denials use spec.validations[].message (below).
+#
+# For clearer operator-facing errors + gh/oras hints, enforce THIS policy and DELETE ClusterPolicy
+# jfrog-nginx-sigstore-bundle — ClusterPolicy verifyImages SigstoreBundle often surfaces raw
+# Sigstore verifier internals (e.g. WithObserverTimestamps / Verifier init) instead of this text.
+#
+# Do not enforce both IVP and clusterpolicy-jfrog-nginx-sigstore-bundle on the same images.
 #
 # GitHub attest-build-provenance uses OCI referrers:
 #   application/vnd.dev.sigstore.bundle.v0.3+json
@@ -57,5 +61,9 @@ spec:
           verifyAttestationSignatures(image, attestations.sigstoreBundle, [attestors.githubWorkflow])
         ).all(e, e > 0)
       message: >-
-        Image must have a valid GitHub Sigstore bundle for jfrog-attestation.yml (@refs/heads/main).
-        If this fails while ClusterPolicy passes, prefer clusterpolicy-jfrog-nginx-sigstore-bundle.yaml only.
+        This image must have GitHub Artifact Attestation (Sigstore bundle v0.3 on OCI referrers) produced by
+        .github/workflows/jfrog-attestation.yml on refs/heads/main for repo dolisss/pov-attestation-test.
+        Confirm with: gh attestation verify oci://dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx@sha256:<digest>
+        --repo dolisss/pov-attestation-test --bundle-from-oci
+        Or: oras discover dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx@sha256:<digest>
+        Pin a digest/tag that has referrers in JFrog; ensure Kyverno can pull (secret regcred in kyverno ns).
