@@ -1,0 +1,58 @@
+# ImageValidatingPolicy (Kyverno 1.17+) — replaces ClusterPolicy verifyImages + SigstoreBundle.
+# Docs: https://kyverno.io/docs/policy-types/image-validating-policy/
+#
+# After applying, delete the legacy ClusterPolicy to avoid duplicate enforcement:
+#   kubectl delete clusterpolicy jfrog-nginx-slsa-provenance --ignore-not-found
+#
+# Registry auth for private JFrog: use spec.credentials.secrets (secrets in kyverno namespace)
+# or configure credentials on the Kyverno deployment.
+
+apiVersion: policies.kyverno.io/v1
+kind: ImageValidatingPolicy
+metadata:
+  name: jfrog-nginx-slsa-provenance
+  annotations:
+    policies.kyverno.io/title: SLSA provenance (GitHub OIDC) for JFrog nirmatainstaller/nginx
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  validationActions:
+    - Deny
+  failurePolicy: Fail
+  webhookConfiguration:
+    timeoutSeconds: 30
+  evaluation:
+    background:
+      enabled: false
+  matchConstraints:
+    resourceRules:
+      - apiGroups: ['']
+        apiVersions: ['v1']
+        operations: ['CREATE', 'UPDATE']
+        resources: ['pods']
+        scope: '*'
+  matchImageReferences:
+    - glob: 'dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx*'
+  attestors:
+    - name: githubWorkflow
+      cosign:
+        keyless:
+          identities:
+            - issuer: https://token.actions.githubusercontent.com
+              subject: https://github.com/dolisss/pov-attestation-test/.github/workflows/jfrog-attestation.yml@refs/heads/main
+        ctlog:
+          url: https://rekor.sigstore.dev
+          insecureIgnoreTlog: true
+          insecureIgnoreSCT: true
+  attestations:
+    - name: slsaProvenance
+      intoto:
+        type: https://slsa.dev/provenance/v1
+  validations:
+    - expression: >-
+        images.containers.map(image,
+          verifyAttestationSignatures(image, attestations.slsaProvenance, [attestors.githubWorkflow])
+        ).all(e, e > 0)
+      message: >-
+        Image must have a valid GitHub SLSA provenance attestation (Sigstore bundle) signed by
+        jfrog-attestation.yml (@refs/heads/main). Use digest or tag that has attestations in JFrog.
