@@ -21,7 +21,7 @@ spec:
                 - Pod
       verifyImages:
         - imageReferences:
-            - "*"
+            - "dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx*"
           failureAction: Enforce
           type: SigstoreBundle
           attestations:
@@ -30,7 +30,8 @@ spec:
                 - entries:
                     - keyless:
                         issuer: https://token.actions.githubusercontent.com
-                        subjectRegExp: "^https://github\\.com/dolisss/pov-attestation-test/\\.github/workflows/jfrog-attestation\\.yml@"
+                        # SAN includes ref after @ e.g. @refs/heads/main — pattern must allow suffix past .yml@
+                        subjectRegExp: "^https://github\\.com/dolisss/pov-attestation-test/\\.github/workflows/jfrog-attestation\\.yml@.+"
                         rekor:
                           url: https://rekor.sigstore.dev
                           ignoreTlog: true
