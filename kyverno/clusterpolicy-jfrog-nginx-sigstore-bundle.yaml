@@ -1,0 +1,51 @@
+# ClusterPolicy with verifyImages.type: SigstoreBundle — Kyverno’s supported path for GitHub
+# Artifact Attestations (application/vnd.dev.sigstore.bundle.v0.3+json on OCI referrers).
+# ImageValidatingPolicy CEL (verifyAttestationSignatures + referrer) does not reliably match
+# this flow on current Kyverno builds; use this policy for admission until IVP gains parity.
+#
+# Apply AFTER removing the ImageValidatingPolicy with the same enforcement goal:
+#   kubectl delete imagevalidatingpolicy jfrog-nginx-slsa-provenance --ignore-not-found
+#
+# Secrets: docker-registry secret `regcred` in namespace `kyverno` for private JFrog.
+
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: jfrog-nginx-sigstore-bundle
+  annotations:
+    policies.kyverno.io/title: GitHub Sigstore bundle + SLSA provenance for JFrog nginx
+    policies.kyverno.io/category: Software Supply Chain Security
+    policies.kyverno.io/severity: high
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookConfiguration:
+    failurePolicy: Fail
+    timeoutSeconds: 30
+  rules:
+    - name: verify-github-attestation-bundle
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+      verifyImages:
+        - imageReferences:
+            - "dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx*"
+          failureAction: Enforce
+          type: SigstoreBundle
+          imageRegistryCredentials:
+            secrets:
+              - regcred
+          attestations:
+            - type: https://slsa.dev/provenance/v1
+              attestors:
+                - entries:
+                    - keyless:
+                        issuer: https://token.actions.githubusercontent.com
+                        subject: https://github.com/dolisss/pov-attestation-test/.github/workflows/jfrog-attestation.yml@refs/heads/main
+                        ctlog:
+                          ignoreSCT: true
+                        rekor:
+                          url: https://rekor.sigstore.dev
+                          ignoreTlog: true
