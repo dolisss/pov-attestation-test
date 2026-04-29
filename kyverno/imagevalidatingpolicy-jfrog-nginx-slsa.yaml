@@ -33,6 +33,11 @@ spec:
         scope: '*'
   matchImageReferences:
     - glob: 'dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx*'
+  # Docker config secrets in namespace kyverno — required for private JFrog (token API + layers + attestations).
+  # kubectl create secret docker-registry regcred -n kyverno --docker-server=dolisss.jfrog.io ...
+  credentials:
+    secrets:
+      - regcred
   attestors:
     - name: githubWorkflow
       cosign:
