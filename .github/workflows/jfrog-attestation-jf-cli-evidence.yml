@@ -1,14 +1,12 @@
-# Pull nginx 1.25, docker push to Artifactory, attest (default: no push-to-registry), then
-#   jf evd create --sigstore-bundle <bundle-path>
+# Pull nginx 1.25, push to JFrog, then actions/attest-build-provenance@v2 with push-to-registry.
+# Sigstore bundle is attached to the image on Artifactory as OCI referrers (same pattern as jfrog-attestation.yml).
 #
-# Repository secrets (only these required):
-#   - JFROG_USER / JFROG_TOKEN — Docker login; same token is passed to JFrog CLI as JF_ACCESS_TOKEN.
-# Platform URL is hardcoded in env YAML_ARTIFACTS_SERVER (JF_URL).
+# jf evd create (JFrog Evidence) is not used here: it returns 403 unless the tenant has Enterprise+
+# ("evidence deployment requires an Enterprise+ license").
 #
-# JFrog: Evidence enabled; token must allow evidence create. If subject resolution fails, see
-#   https://docs.jfrog.com/governance/docs/create-evidence-cli (--subject-repo-path).
+# Secrets: JFROG_USER, JFROG_TOKEN (Docker login to dolisss.jfrog.io)
 
-name: Push nginx 1.25 to JFrog — attest via JFrog CLI (Evidence)
+name: Push nginx 1.25 to JFrog with attestations
 
 on:
   workflow_dispatch:
@@ -22,16 +20,15 @@ permissions:
   contents: read
   id-token: write
   attestations: write
+  artifact-metadata: write
 
 env:
   JFROG_DOCKER_REGISTRY: dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx
   IMAGE_TAG: "1.25"
   UPSTREAM_IMAGE: nginx:1.25
-  # JFrog Platform URL for setup-jfrog-cli (JF_URL)
-  YAML_ARTIFACTS_SERVER: https://dolisss.jfrog.io
 
 jobs:
-  push-attest-jf-cli:
+  push-and-attest:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -44,7 +41,7 @@ jobs:
         run: |
           echo "login_host=${REG_PREFIX%%/*}" >> "${GITHUB_OUTPUT}"
 
-      - name: Log in to JFrog (Docker)
+      - name: Log in to JFrog
         uses: docker/login-action@v3
         with:
           registry: ${{ steps.jfrog.outputs.login_host }}
@@ -72,27 +69,9 @@ jobs:
           fi
           echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
 
-      - name: Set up JFrog CLI
-        uses: jfrog/setup-jfrog-cli@v4
-        env:
-          JF_URL: ${{ env.YAML_ARTIFACTS_SERVER }}
-          # CLI expects JF_ACCESS_TOKEN; reuse the same Artifactory token as Docker login.
-          JF_ACCESS_TOKEN: ${{ secrets.JFROG_TOKEN }}
-
-      - name: Generate build provenance attestation (bundle only; no OCI referrer push)
-        id: attest
+      - name: Generate build provenance attestation
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ env.JFROG_DOCKER_REGISTRY }}
           subject-digest: ${{ steps.push.outputs.digest }}
-
-      - name: Push attestation bundle to JFrog Evidence
-        env:
-          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
-        run: |
-          set -euo pipefail
-          if [ -z "${BUNDLE_PATH}" ] || [ ! -f "${BUNDLE_PATH}" ]; then
-            echo "::error::Missing attestation bundle at bundle-path output"
-            exit 1
-          fi
-          jf evd create --sigstore-bundle "${BUNDLE_PATH}"
+          push-to-registry: true
