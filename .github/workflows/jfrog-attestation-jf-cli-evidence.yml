@@ -1,12 +1,16 @@
-# Pull nginx 1.25, push to JFrog, then actions/attest-build-provenance@v2 with push-to-registry.
-# Sigstore bundle is attached to the image on Artifactory as OCI referrers (same pattern as jfrog-attestation.yml).
+# Push nginx 1.25 to Artifactory, generate GitHub build provenance, then upload the Sigstore bundle
+# to JFrog Evidence (Evidence tab in the UI), not as OCI referrers on the image.
 #
-# jf evd create (JFrog Evidence) is not used here: it returns 403 unless the tenant has Enterprise+
-# ("evidence deployment requires an Enterprise+ license").
+# - push-to-registry: false — avoids attaching the bundle under image metadata / OCI referrers.
+# - jf evd create --sigstore-bundle — registers evidence so it appears in the JFrog Evidence experience.
 #
-# Secrets: JFROG_USER, JFROG_TOKEN (Docker login to dolisss.jfrog.io)
+# JFrog blocks Evidence deployment without the right license (HTTP 403:
+#   "evidence deployment requires an Enterprise+ license"). The workflow is correct; the tenant
+#   must have Evidence / Enterprise+ for this step to succeed. Contact JFrog to enable it.
+#
+# Secrets: JFROG_USER, JFROG_TOKEN (Docker + JFrog CLI: JF_ACCESS_TOKEN maps to this secret)
 
-name: Push nginx 1.25 to JFrog with attestations
+name: Push nginx 1.25 to JFrog — Evidence (Sigstore bundle)
 
 on:
   workflow_dispatch:
@@ -20,15 +24,15 @@ permissions:
   contents: read
   id-token: write
   attestations: write
-  artifact-metadata: write
 
 env:
   JFROG_DOCKER_REGISTRY: dolisss.jfrog.io/nginx-docker/nirmatainstaller/nginx
   IMAGE_TAG: "1.25"
   UPSTREAM_IMAGE: nginx:1.25
+  YAML_ARTIFACTS_SERVER: https://dolisss.jfrog.io
 
 jobs:
-  push-and-attest:
+  push-image-and-evidence:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -41,7 +45,7 @@ jobs:
         run: |
           echo "login_host=${REG_PREFIX%%/*}" >> "${GITHUB_OUTPUT}"
 
-      - name: Log in to JFrog
+      - name: Log in to JFrog (Docker)
         uses: docker/login-action@v3
         with:
           registry: ${{ steps.jfrog.outputs.login_host }}
@@ -69,9 +73,27 @@ jobs:
           fi
           echo "digest=${DIGEST}" >> "${GITHUB_OUTPUT}"
 
-      - name: Generate build provenance attestation
+      - name: Set up JFrog CLI
+        uses: jfrog/setup-jfrog-cli@v4
+        env:
+          JF_URL: ${{ env.YAML_ARTIFACTS_SERVER }}
+          JF_ACCESS_TOKEN: ${{ secrets.JFROG_TOKEN }}
+
+      - name: Generate build provenance (bundle only; not pushed to registry OCI metadata)
+        id: attest
         uses: actions/attest-build-provenance@v2
         with:
           subject-name: ${{ env.JFROG_DOCKER_REGISTRY }}
           subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
+          push-to-registry: false
+
+      - name: Upload Sigstore bundle to JFrog Evidence
+        env:
+          BUNDLE_PATH: ${{ steps.attest.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          if [ -z "${BUNDLE_PATH}" ] || [ ! -f "${BUNDLE_PATH}" ]; then
+            echo "::error::Missing attestation bundle at bundle-path output"
+            exit 1
+          fi
+          jf evd create --sigstore-bundle "${BUNDLE_PATH}"
